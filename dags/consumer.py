@@ -10,9 +10,10 @@ with DAG('consumer',
          start_date=datetime(2024,12,16),
          catchup=False):
     
-    @task
+    @task(inlets=[my_file])
     def read_dataset():
         with open(my_file.uri,'r') as f:
-            print(f.read)
-        
+            print(f.read())
+            f.close
     read_dataset()
+    

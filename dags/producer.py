@@ -10,9 +10,10 @@ with DAG('producer',
          start_date=datetime(2024,12,16),
          catchup=False):
     
-    @task
+    @task(outlets=[my_file])
     def update_dataset():
-        with open(my_file.uri,'a+') as f:
+        with open(my_file.uri,'w+') as f:
             f.write('prodcuer updated this file')
+            f.close
         
     update_dataset()

@@ -1,26 +1,28 @@
-from datetime import datetime
-from airflow.decorators import task, dag
+from airflow import DAG
 from airflow.providers.docker.operators.docker import DockerOperator
+from datetime import datetime, timedelta
 
-def my_evaluation():
-    return False
+default_args = {
+    'owner': 'airflow',
+    'start_date': datetime(2024, 1, 1),
+    'retries': 1,
+    'retry_delay': timedelta(minutes=5),
+}
 
-@dag(
-    start_date=datetime(2024, 12, 16),
-    schedule='@daily',
-    catchup=False,
+dag = DAG(
+    'docker_test',
+    default_args=default_args,
+    schedule_interval=timedelta(days=1),
+    catchup=False
 )
-def docker_dag():
-    
-    @task
-    def task1():
-        print("hello from task 1")
 
-    task2=DockerOperator(task_id='docker_task',image='stock_image_final:v1.0.0',command='echo "Hello In Docker"',
-    docker_url="unix://var/run/docker.sock",
-    network_mode="bridge")
-
-    task1()>>task2
-    
-docker_dag()
-
+docker_task = DockerOperator(
+    task_id='docker_command',
+    image='hello-world',
+    container_name='test_container',
+    api_version='auto',
+    auto_remove=True,
+    docker_url='unix://var/run/docker.sock',
+    network_mode='bridge',
+    dag=dag
+)

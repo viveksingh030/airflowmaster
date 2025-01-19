@@ -31,7 +31,7 @@ def _process_user(ti):
     process_user.to_csv('/tmp/process_user.csv',index=None,header=False)
     
 with DAG('user_processing',
-         start_date=datetime(2024, 12, 13),
+         start_date=datetime(2025, 1, 19),
          schedule_interval="@daily",  # Correct argument for scheduling
          catchup=False):
     None

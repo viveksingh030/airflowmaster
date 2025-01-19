@@ -8,3 +8,5 @@
 * pip install apache-airflow-providers-postgres
 
 * pip install pandas
+
+pip install apache-airflow-providers-jenkins

@@ -3,6 +3,7 @@ import random
 from airflow import DAG
 from airflow.operators.python import PythonOperator, BranchPythonOperator
 from airflow.operators.bash import BashOperator
+from airflow.utils.trigger_rule import TriggerRule
 
 from datetime import datetime
 
@@ -46,7 +47,7 @@ with DAG("xcom_dag", start_date=datetime(2024, 12, 14),
     t4 = BashOperator(
         task_id='t4',
         bash_command="echo ''",
-        trigger_rule='one_success'
+        trigger_rule=TriggerRule.NONE_FAILED
     )
 
     t1 >> branch

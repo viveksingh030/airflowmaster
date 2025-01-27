@@ -4,7 +4,7 @@ from airflow.models.baseoperator import chain
 from datetime import datetime
 
 def my_evaluation():
-    return False
+    return True
 
 @dag(
     start_date=datetime(2024, 12, 16),

@@ -13,13 +13,7 @@ def get_jenkins_connection(jenkins_conn_id):
     connection = BaseHook.get_connection(jenkins_conn_id)
     host = connection.host.rstrip('/')
     port = connection.port or 8080
-    auth_string = f"{connection.login}:{connection.password}"
-    encoded_auth = base64.b64encode(auth_string.encode('utf-8')).decode('utf-8')
-    return {
-        "host": host,
-        "port": port,
-        "auth_header": {"Authorization": f"Basic {encoded_auth}"}
-    }
+    return connection
 
 def trigger_jenkins_job(job_name, jenkins_conn_id='jenkins_http', **kwargs):
     """Trigger a Jenkins job and return the build number."""

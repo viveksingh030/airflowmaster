@@ -3,20 +3,24 @@ import logging
 from datetime import datetime
 
 from airflow import DAG
-from airflow.models import Variable
 from airflow.operators.python import get_current_context, PythonOperator
 from airflow.providers.amazon.aws.operators.sagemaker import SageMakerProcessingOperator
 from airflow.operators.python import BranchPythonOperator
+from airflow.providers.jenkins.operators.jenkins_job_trigger import (
+    JenkinsJobTriggerOperator,
+)
 from airflow.utils.trigger_rule import TriggerRule
 from airflow.models.xcom_arg import XComArg
-from sagemaker.network import NetworkConfig
 from airflow.operators.empty import EmptyOperator
-from airflow.providers.jenkins.operators.jenkins_job_trigger import JenkinsJobTriggerOperator
+
+
+def hello():
+    print("Hello from pipleine")
 
 ECR_REPOSITORY_URI = "362231854019.dkr.ecr.eu-west-1.amazonaws.com/quality-excellence-center/id-manipulation-pipeline:0.0.1rc3.dev3-test_run_fix_dag_run-quality-excellence-center-amd64"
 FACE_DETECTION_MODEL_PACKAGE_ARN = 'arn:aws:sagemaker:eu-west-1:520701946683:model-package/face-detection/60'
 MRZ_READER_MODEL_PACKAGE_ARN = 'arn:aws:sagemaker:eu-west-1:520701946683:model-package/mrz-deep-reader/55'
-JENKINS_CONNECTION_ID = 'cd_jenkins_connection'
+JENKINS_CONNECTION_ID = 'jenkins_http'
 
 
 def decide_next_task(config, task_type="deployment", **kwargs):
@@ -64,13 +68,13 @@ def job_set_up(role_arn, time, **context):
     consent = custom_config.get('consent')
     face_replacement = custom_config.get('face_replacement')
     mrz_removal = custom_config.get('mrz_removal')
-    sm_network_configuration = Variable.get("sm_network_configuration")
-    sm_network_configuration = json.loads(sm_network_configuration)
+    # sm_network_configuration = Variable.get("sm_network_configuration")
+    # sm_network_configuration = json.loads(sm_network_configuration)
 
-    network_config = NetworkConfig(
-        subnets=sm_network_configuration.get("private_subnets"),
-        security_group_ids=sm_network_configuration.get("sm_security_group_ids"),
-    )._to_request_dict()
+    # network_config = NetworkConfig(
+    #     subnets=sm_network_configuration.get("private_subnets"),
+    #     security_group_ids=sm_network_configuration.get("sm_security_group_ids"),
+    # )._to_request_dict()
 
     environment = {
         "consent": consent,
@@ -106,7 +110,7 @@ def job_set_up(role_arn, time, **context):
         },
         "RoleArn": role_arn,
         "Environment": environment,
-        "NetworkConfig": network_config
+        "NetworkConfig": None
     }
     logger.info("id_manipulation_pipeline is called inside job_set_up")
     ti = get_current_context()["ti"]
@@ -116,12 +120,11 @@ def job_set_up(role_arn, time, **context):
 
 def get_next_task(task_type="deployment", **context):
     ti = context['task_instance']
-    return ti.xcom_pull(task_ids='job_set_up', key='processing_config')
-    config = get_task_config(**context)
+    config = ti.xcom_pull(task_ids='job_set_up', key='processing_config')
     return decide_next_task(config, task_type)
 
 
-with DAG(dag_id="synthetic_id_endpoint_deploy_destroy",
+with DAG(dag_id="synthetic_id_endpoint_deploy_destroy_2",
          default_args=DEFAULT_ARGS,
          tags=["qec", "team:qec"],
          start_date=datetime(2024, 2, 27),
@@ -134,7 +137,7 @@ with DAG(dag_id="synthetic_id_endpoint_deploy_destroy",
         task_id='job_set_up',
         python_callable=job_set_up,
         op_kwargs={
-            'role_arn': Variable.get('training_pipeline_role'),
+            'role_arn': 'training_pipeline_role',
             'time': formatted_datetime
         },
         provide_context=True,
@@ -151,7 +154,7 @@ with DAG(dag_id="synthetic_id_endpoint_deploy_destroy",
 
     deploy_face_detection_endpoint = JenkinsJobTriggerOperator(
         task_id="deploy_face_detection_live",
-        job_name="ml-prod-environments/ml-endpoint-deploy",
+        job_name="ml-endpoint-deploy",
         parameters={
             "delay": "0sec",
             "endpointName": 'face-detection',
@@ -166,7 +169,7 @@ with DAG(dag_id="synthetic_id_endpoint_deploy_destroy",
 
     deploy_mrz_deep_reader_endpoint = JenkinsJobTriggerOperator(
         task_id="deploy_mrz_deep_reader_shadow",
-        job_name="ml-prod-environments/ml-endpoint-deploy",
+        job_name="ml-endpoint-deploy",
         parameters={
             "delay": "0sec",
             "endpointName": 'mrz-deep-reader',
@@ -183,7 +186,7 @@ with DAG(dag_id="synthetic_id_endpoint_deploy_destroy",
 
     destroy_face_detection_endpoint = JenkinsJobTriggerOperator(
         task_id="destroy_face_detection_live",
-        job_name="ml-prod-environments/ml-endpoint-destroy",
+        job_name="ml-endpoint-deploy",
         parameters={
             "delay": "0sec",
             "endpointName": 'face-detection',
@@ -197,7 +200,7 @@ with DAG(dag_id="synthetic_id_endpoint_deploy_destroy",
 
     destroy_mrz_deep_reader_endpoint = JenkinsJobTriggerOperator(
         task_id="destroy_mrz_deep_reader_shadow",
-        job_name="ml-prod-environments/ml-endpoint-destroy",
+        job_name="ml-endpoint-deploy",
         parameters={
             "delay": "0sec",
             "endpointName": 'mrz-deep-reader',
@@ -209,9 +212,10 @@ with DAG(dag_id="synthetic_id_endpoint_deploy_destroy",
         dag=dag
     )
 
-    task1 = SageMakerProcessingOperator(
+    task1 = PythonOperator(
         task_id="manipulate_id_task",
-        config=XComArg(set_up, key='processing_config'),
+        op_args={'config':XComArg(set_up, key='processing_config')},
+        python_callable=hello,
         trigger_rule=TriggerRule.NONE_FAILED,
         dag=dag
     )

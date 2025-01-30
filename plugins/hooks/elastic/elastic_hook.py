@@ -8,20 +8,43 @@ class ElasticHook(BaseHook):
     def __init__(self, conn_id='elastic_default', *args, **kwargs):
         super().__init__(*args, **kwargs)
         conn = self.get_connection(conn_id)
+        
+        # Parse connection extra parameters
+        extra = conn.extra_dejson  # Airflow's built-in JSON parser
+        scheme = extra.get("scheme", "http")  # Default to HTTP if not specified
+
+        hosts = []
+        if conn.host:
+            for host_entry in conn.host.split(','):
+                host_entry = host_entry.strip()
+                if ':' in host_entry:
+                    host, port = host_entry.split(':', 1)
+                    port = int(port.strip())
+                else:
+                    host = host_entry.strip()
+                    port = int(conn.port) if conn.port else 9200
+                
+                hosts.append({
+                    'host': host,
+                    'port': port,
+                    'scheme': scheme  # <-- Add scheme here
+                })
 
         conn_config = {}
-        hosts = []
-
-        if conn.host:
-            hosts = conn.host.split(',')
-        if conn.port:
-            conn_config['port'] = int(conn.port)
         if conn.login:
             conn_config['http_auth'] = (conn.login, conn.password)
 
+        # Add SSL verification if using HTTPS
+        if scheme == "https":
+            conn_config.update({
+                'use_ssl': True,
+                'verify_certs': extra.get("verify_certs", False),
+                'ca_certs': extra.get("ca_certs")
+            })
+
         self.es = Elasticsearch(hosts, **conn_config)
         self.index = conn.schema
-
+    
     def info(self):
         return self.es.info()
 

@@ -46,10 +46,10 @@ x-airflow-common:
   # In order to add custom dependencies or upgrade provider packages you can use your extended image.
   # Comment the image line, place your Dockerfile in the directory where you placed the docker-compose.yaml
   # and uncomment the "build" line below, Then run `docker-compose build` to build the images.
-  image: apache/airflow:2.8.2
-  build:
-   context: .
-  # build: .
+  # image: apache/airflow:2.8.2
+  # build:
+  #  context: .
+  build: .
   environment:
     &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: CeleryExecutor
@@ -63,10 +63,12 @@ x-airflow-common:
     AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
     _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-apache-airflow-providers-docker}
+    AIRFLOW_CONFIG: '/opt/airflow/config/airflow.cfg'
   volumes:
     - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
     - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
     - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
+    - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
     - /var/run/docker.sock:/var/run/docker.sock
     - /tmp:/tmp  
   user: "${AIRFLOW_UID:-50000}:0"
@@ -99,6 +101,18 @@ services:
       test: ["CMD", "pg_isready", "-U", "airflow"]
       interval: 5s
       retries: 5
+    restart: always
+
+  jenkins:
+    image: jenkins/jenkins:latest # Use the Long-Term Support (LTS) version of Jenkins
+    container_name: jenkins
+    ports:
+      - "8080:8080" # Map Jenkins web interface to host
+      - "50000:50000" # Port for agent connections
+    volumes:
+      - /Users/vivekkumarsingh/jenkins_data_2:/var/jenkins_home # Persist Jenkins data
+    environment:
+      JAVA_OPTS: "-Djenkins.install.runSetupWizard=false" # Skip initial setup wizard (optional)
     restart: always
 
   redis:
